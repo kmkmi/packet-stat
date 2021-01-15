@@ -9,7 +9,7 @@
 #include <netinet/udp.h>
 #include <arpa/inet.h>
 #include <map>
-
+#include <tuple>
 
 
 
@@ -21,10 +21,10 @@ std::map<std::string, std::map<std::string, unsigned int> > endpoints_eth;
 std::map<std::pair<std::string, std::string> , std::map<std::string, unsigned int> > conversations_eth;
 
 std::map<std::pair<uint32_t, uint16_t> , std::map<std::string, unsigned int> > endpoints_tcp;
-std::map<std::pair<std::pair<uint32_t, uint16_t>, std::pair<uint32_t, uint16_t> > , std::map<std::string, unsigned int> > conversations_tcp;
+std::map<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>, std::map<std::string, unsigned int> > conversations_tcp;
 
 std::map<std::pair<uint32_t, uint16_t> , std::map<std::string, unsigned int> > endpoints_udp;
-std::map<std::pair<std::pair<uint32_t, uint16_t>, std::pair<uint32_t, uint16_t> > , std::map<std::string, unsigned int> > conversations_udp;
+std::map<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>, std::map<std::string, unsigned int> > conversations_udp;
 
 void usage() {
     printf("syntax: pcap-test <filename>\n");
@@ -253,12 +253,10 @@ void callback(u_char *user ,const struct pcap_pkthdr* header, const u_char* pkt_
 
 
             //Conversations TCP
-            std::pair<std::pair<uint32_t, uint16_t>, std::pair<uint32_t, uint16_t> > pr2 =
+            std::tuple<uint32_t, uint16_t, uint32_t, uint16_t> pr2 =
                     (ipv4_hdr->ip_src.s_addr < ipv4_hdr->ip_dst.s_addr)
-                    ? std::make_pair(std::make_pair(ipv4_hdr->ip_src.s_addr, sport)
-                                     , std::make_pair(ipv4_hdr->ip_dst.s_addr, dport))
-                    : std::make_pair(std::make_pair(ipv4_hdr->ip_dst.s_addr, dport)
-                                     , std::make_pair(ipv4_hdr->ip_src.s_addr, sport));
+                    ? std::make_tuple(ipv4_hdr->ip_src.s_addr, sport, ipv4_hdr->ip_dst.s_addr, dport)
+                    : std::make_tuple(ipv4_hdr->ip_dst.s_addr, dport, ipv4_hdr->ip_src.s_addr, sport);
 
 
             auto itr3 = conversations_tcp.find(pr2);
@@ -335,12 +333,11 @@ void callback(u_char *user ,const struct pcap_pkthdr* header, const u_char* pkt_
 
 
             //Conversations UDP
-            std::pair<std::pair<uint32_t, uint16_t>, std::pair<uint32_t, uint16_t> > pr2 =
+            std::tuple<uint32_t, uint16_t, uint32_t, uint16_t> pr2 =
                     (ipv4_hdr->ip_src.s_addr < ipv4_hdr->ip_dst.s_addr)
-                    ? std::make_pair(std::make_pair(ipv4_hdr->ip_src.s_addr, sport)
-                                     , std::make_pair(ipv4_hdr->ip_dst.s_addr, dport))
-                    : std::make_pair(std::make_pair(ipv4_hdr->ip_dst.s_addr, dport)
-                                     , std::make_pair(ipv4_hdr->ip_src.s_addr, sport));
+                    ? std::make_tuple(ipv4_hdr->ip_src.s_addr, sport, ipv4_hdr->ip_dst.s_addr, dport)
+                    : std::make_tuple(ipv4_hdr->ip_dst.s_addr, dport, ipv4_hdr->ip_src.s_addr, sport);
+
 
 
             auto itr3 = conversations_udp.find(pr2);
@@ -489,10 +486,10 @@ int main(int argc, char* argv[]) {
 
     printf("Conversations-tcp\n\n");
     for(auto i : conversations_tcp){
-        st.s_addr = i.first.first.first;
-        printf("Address :\t%s\tPort :\t%u\n", inet_ntoa(st), i.first.first.second );
-        st.s_addr = i.first.second.first;
-        printf("Address :\t%s\tPort :\t%u\n", inet_ntoa(st), i.first.second.second );
+        st.s_addr = std::get<0>(i.first);
+        printf("Address :\t%s\tPort :\t%u\n", inet_ntoa(st), std::get<1>(i.first) );
+        st.s_addr = std::get<2>(i.first);
+        printf("Address :\t%s\tPort :\t%u\n", inet_ntoa(st), std::get<3>(i.first) );
         for(auto j : i.second){
             printf("%s :\t%u\n", j.first.c_str(), j.second);
         }
@@ -503,10 +500,10 @@ int main(int argc, char* argv[]) {
 
     printf("Conversations-udp\n\n");
     for(auto i : conversations_udp){
-        st.s_addr = i.first.first.first;
-        printf("Address :\t%s\tPort :\t%u\n", inet_ntoa(st), i.first.first.second );
-        st.s_addr = i.first.second.first;
-        printf("Address :\t%s\tPort :\t%u\n", inet_ntoa(st), i.first.second.second );
+        st.s_addr = std::get<0>(i.first);
+        printf("Address :\t%s\tPort :\t%u\n", inet_ntoa(st), std::get<1>(i.first) );
+        st.s_addr = std::get<2>(i.first);
+        printf("Address :\t%s\tPort :\t%u\n", inet_ntoa(st), std::get<3>(i.first) );
         for(auto j : i.second){
             printf("%s :\t%u\n", j.first.c_str(), j.second);
         }
