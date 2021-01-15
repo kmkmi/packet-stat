@@ -253,22 +253,22 @@ void callback(u_char *user ,const struct pcap_pkthdr* header, const u_char* pkt_
 
 
             //Conversations TCP
-            std::tuple<uint32_t, uint16_t, uint32_t, uint16_t> pr2 =
+            std::tuple<uint32_t, uint16_t, uint32_t, uint16_t> tp =
                     (ipv4_hdr->ip_src.s_addr < ipv4_hdr->ip_dst.s_addr)
                     ? std::make_tuple(ipv4_hdr->ip_src.s_addr, sport, ipv4_hdr->ip_dst.s_addr, dport)
                     : std::make_tuple(ipv4_hdr->ip_dst.s_addr, dport, ipv4_hdr->ip_src.s_addr, sport);
 
 
-            auto itr3 = conversations_tcp.find(pr2);
+            auto itr3 = conversations_tcp.find(tp);
 
             if (itr3 != conversations_tcp.end()) {
                 if(ipv4_hdr->ip_src.s_addr < ipv4_hdr->ip_dst.s_addr){
-                    conversations_tcp[pr2]["Packets A -> B"]++;
-                    conversations_tcp[pr2]["Bytes A -> B"] += header->caplen;
+                    conversations_tcp[tp]["Packets A -> B"]++;
+                    conversations_tcp[tp]["Bytes A -> B"] += header->caplen;
                 }else{
 
-                    conversations_tcp[pr2]["Packets B -> A"]++;
-                    conversations_tcp[pr2]["Bytes B -> A"] += header->caplen;
+                    conversations_tcp[tp]["Packets B -> A"]++;
+                    conversations_tcp[tp]["Bytes B -> A"] += header->caplen;
                 }
             }else{
 
@@ -284,7 +284,7 @@ void callback(u_char *user ,const struct pcap_pkthdr* header, const u_char* pkt_
                     mp.insert({"Packets B -> A",1});
                     mp.insert({"Bytes B -> A",header->caplen});
                 }
-                conversations_tcp.insert({pr2,mp});
+                conversations_tcp.insert({tp,mp});
             }
 
 
@@ -333,23 +333,23 @@ void callback(u_char *user ,const struct pcap_pkthdr* header, const u_char* pkt_
 
 
             //Conversations UDP
-            std::tuple<uint32_t, uint16_t, uint32_t, uint16_t> pr2 =
+            std::tuple<uint32_t, uint16_t, uint32_t, uint16_t> tp =
                     (ipv4_hdr->ip_src.s_addr < ipv4_hdr->ip_dst.s_addr)
                     ? std::make_tuple(ipv4_hdr->ip_src.s_addr, sport, ipv4_hdr->ip_dst.s_addr, dport)
                     : std::make_tuple(ipv4_hdr->ip_dst.s_addr, dport, ipv4_hdr->ip_src.s_addr, sport);
 
 
 
-            auto itr3 = conversations_udp.find(pr2);
+            auto itr3 = conversations_udp.find(tp);
 
             if (itr3 != conversations_udp.end()) {
                 if(ipv4_hdr->ip_src.s_addr < ipv4_hdr->ip_dst.s_addr){
-                    conversations_udp[pr2]["Packets A -> B"]++;
-                    conversations_udp[pr2]["Bytes A -> B"] += header->caplen;
+                    conversations_udp[tp]["Packets A -> B"]++;
+                    conversations_udp[tp]["Bytes A -> B"] += header->caplen;
                 }else{
 
-                    conversations_udp[pr2]["Packets B -> A"]++;
-                    conversations_udp[pr2]["Bytes B -> A"] += header->caplen;
+                    conversations_udp[tp]["Packets B -> A"]++;
+                    conversations_udp[tp]["Bytes B -> A"] += header->caplen;
                 }
             }else{
 
@@ -365,7 +365,7 @@ void callback(u_char *user ,const struct pcap_pkthdr* header, const u_char* pkt_
                     mp.insert({"Packets B -> A",1});
                     mp.insert({"Bytes B -> A",header->caplen});
                 }
-                conversations_udp.insert({pr2,mp});
+                conversations_udp.insert({tp,mp});
             }
 
         }
