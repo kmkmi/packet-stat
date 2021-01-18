@@ -10,21 +10,39 @@
 #include <arpa/inet.h>
 #include <map>
 #include <tuple>
+#include "main.h"
+
+#define reverse_pair(pr) std::make_pair(pr.second, pr.first)
+#define reverse_tp(tp) std::make_tuple(std::get<2>(tp),std::get<3>(tp),std::get<0>(tp),std::get<1>(tp))
 
 
 
+typedef std::map<uint32_t, EP_Value > Endpoint_ipv4;
+Endpoint_ipv4 endpoints_ipv4;
 
-std::map<uint32_t, std::map<std::string, unsigned int> > endpoints_ipv4;
-std::map<std::pair<uint32_t, uint32_t> , std::map<std::string, unsigned int> > conversations_ipv4;
+typedef std::map<std::pair<uint32_t, uint32_t> , Flow_Value > Flows_ipv4;
+Flows_ipv4 flows_ipv4;
 
-std::map<std::string, std::map<std::string, unsigned int> > endpoints_eth;
-std::map<std::pair<std::string, std::string> , std::map<std::string, unsigned int> > conversations_eth;
+typedef std::map<Mac, EP_Value> Endpoints_eth;
+Endpoints_eth endpoints_eth;
 
-std::map<std::pair<uint32_t, uint16_t> , std::map<std::string, unsigned int> > endpoints_tcp;
-std::map<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>, std::map<std::string, unsigned int> > conversations_tcp;
+typedef std::map<std::pair<Mac, Mac> , Flow_Value > Flows_eth;
+Flows_eth flows_eth;
 
-std::map<std::pair<uint32_t, uint16_t> , std::map<std::string, unsigned int> > endpoints_udp;
-std::map<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>, std::map<std::string, unsigned int> > conversations_udp;
+typedef std::map<std::pair<uint32_t, uint16_t> , EP_Value > Endpoints_tcp;
+Endpoints_tcp endpoints_tcp;
+
+typedef std::map<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>, Flow_Value > Flows_tcp;
+Flows_tcp flows_tcp;
+
+typedef std::map<std::pair<uint32_t, uint16_t> , EP_Value > Endpoints_udp;
+Endpoints_udp endpoints_udp;
+
+typedef std::map<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>, Flow_Value > Flows_udp;
+Flows_udp flows_udp;
+
+
+
 
 void usage() {
     printf("syntax: pcap-test <filename>\n");
@@ -71,137 +89,87 @@ void callback(u_char *user ,const struct pcap_pkthdr* header, const u_char* pkt_
         //Endpoints IPv4
         auto itr = endpoints_ipv4.find(ipv4_hdr->ip_src.s_addr);
         if (itr != endpoints_ipv4.end()) {
-            endpoints_ipv4[ipv4_hdr->ip_src.s_addr]["Tx Packets"]++;
-            endpoints_ipv4[ipv4_hdr->ip_src.s_addr]["Tx Bytes"] += header->caplen;
+            itr->second.Tx_Packets++;
+            itr->second.Tx_Bytes += header->caplen;
 
         } else {
 
-            std::map<std::string, unsigned int> mp;
-            mp.insert({"Tx Packets",1});
-            mp.insert({"Tx Bytes",header->caplen});
-            mp.insert({"Rx Packets",0});
-            mp.insert({"Rx Bytes",0});
-            endpoints_ipv4.insert({ipv4_hdr->ip_src.s_addr,mp});
+            EP_Value ev = {1, header->caplen, 0, 0};
+            endpoints_ipv4.insert({ipv4_hdr->ip_src.s_addr,ev});
         }
 
         itr = endpoints_ipv4.find(ipv4_hdr->ip_dst.s_addr);
         if (itr != endpoints_ipv4.end()) {
-            endpoints_ipv4[ipv4_hdr->ip_dst.s_addr]["Rx Packets"]++;
-            endpoints_ipv4[ipv4_hdr->ip_dst.s_addr]["Rx Bytes"] += header->caplen;
+            itr->second.Rx_Packets++;
+            itr->second.Rx_Bytes += header->caplen;
 
         } else {
 
-            std::map<std::string, unsigned int> mp;
-            mp.insert({"Rx Packets",1});
-            mp.insert({"Rx Bytes",header->caplen});
-            mp.insert({"Tx Packets",0});
-            mp.insert({"Tx Bytes",0});
-            endpoints_ipv4.insert({ipv4_hdr->ip_dst.s_addr,mp});
+            EP_Value ev = {0, 0, 1, header->caplen};
+            endpoints_ipv4.insert({ipv4_hdr->ip_dst.s_addr,ev});
         }
 
 
 
-        //Conversations IPv4
-        std::pair<uint32_t, uint32_t> pr = (ipv4_hdr->ip_src.s_addr < ipv4_hdr->ip_dst.s_addr)
-                ? std::make_pair(ipv4_hdr->ip_src.s_addr, ipv4_hdr->ip_dst.s_addr)
-                : std::make_pair(ipv4_hdr->ip_dst.s_addr, ipv4_hdr->ip_src.s_addr);
+        //Flows IPv4
+        std::pair<uint32_t, uint32_t> pr
+                = std::make_pair(ipv4_hdr->ip_src.s_addr, ipv4_hdr->ip_dst.s_addr);
 
 
-        auto itr3 = conversations_ipv4.find(pr);
+        auto itr3 = flows_ipv4.find(pr);
 
-        if (itr3 != conversations_ipv4.end()) {
-            if(ipv4_hdr->ip_src.s_addr < ipv4_hdr->ip_dst.s_addr){
-                conversations_ipv4[pr]["Packets A -> B"]++;
-                conversations_ipv4[pr]["Bytes A -> B"] += header->caplen;
-            }else{
+        if (itr3 != flows_ipv4.end()) {
+            itr3->second.Packets++;
+            itr3->second.Bytes += header->caplen;
 
-                conversations_ipv4[pr]["Packets B -> A"]++;
-                conversations_ipv4[pr]["Bytes B -> A"] += header->caplen;
-            }
         }else{
 
-            std::map<std::string, unsigned int> mp;
-            if(ipv4_hdr->ip_src.s_addr < ipv4_hdr->ip_dst.s_addr){
-                mp.insert({"Packets A -> B",1});
-                mp.insert({"Bytes A -> B",header->caplen});
-                mp.insert({"Packets B -> A",0});
-                mp.insert({"Bytes B -> A",0});
-            }else{
-                mp.insert({"Packets A -> B",0});
-                mp.insert({"Bytes A -> B",0});
-                mp.insert({"Packets B -> A",1});
-                mp.insert({"Bytes B -> A",header->caplen});
-            }
-            conversations_ipv4.insert({pr,mp});
+            Flow_Value fv = {1, header->caplen };
+            flows_ipv4.insert({pr, fv});
         }
 
+
         //Endpoints Ethernet
-        std::string shost = std::string((char*)eth_hdr->ether_shost).substr(0,6);
-        std::string dhost = std::string((char*)eth_hdr->ether_dhost).substr(0,6);
+        Mac shost = Mac((uint8_t*)eth_hdr->ether_shost);
+        Mac dhost = Mac((uint8_t*)eth_hdr->ether_dhost);
 
 
         auto itr2 = endpoints_eth.find(shost);
         if (itr2 != endpoints_eth.end()) {
-            endpoints_eth[shost]["Tx Packets"]++;
-            endpoints_eth[shost]["Tx Bytes"] += header->caplen;
+            itr2->second.Tx_Packets++;
+            itr2->second.Tx_Bytes += header->caplen;
 
         } else {
 
-            std::map<std::string, unsigned int> mp;
-            mp.insert({"Tx Packets",1});
-            mp.insert({"Tx Bytes",header->caplen});
-            mp.insert({"Rx Packets",0});
-            mp.insert({"Rx Bytes",0});
-            endpoints_eth.insert({shost,mp});
+            EP_Value ev = {1, header->caplen, 0, 0};
+            endpoints_eth.insert({shost,ev});
         }
 
         itr2 = endpoints_eth.find(dhost);
         if (itr2 != endpoints_eth.end()) {
-            endpoints_eth[dhost]["Rx Packets"]++;
-            endpoints_eth[dhost]["Rx Bytes"] += header->caplen;
+            itr2->second.Rx_Packets++;
+            itr2->second.Rx_Bytes += header->caplen;
 
         } else {
 
-            std::map<std::string, unsigned int> mp;
-            mp.insert({"Rx Packets",1});
-            mp.insert({"Rx Bytes",header->caplen});
-            mp.insert({"Tx Packets",0});
-            mp.insert({"Tx Bytes",0});
-            endpoints_eth.insert({dhost,mp});
+            EP_Value ev = { 0, 0, 1, header->caplen};
+            endpoints_eth.insert({dhost,ev});
         }
 
-        //Conversations Ethernet
-        std::pair<std::string, std::string> pr2 = shost.compare(dhost)<0
-                ? std::make_pair(shost, dhost)
-                : std::make_pair(dhost, shost);
+        //Flows Ethernet
+        std::pair<Mac, Mac> pr2 = std::make_pair(shost, dhost);
 
 
-        auto itr4 = conversations_eth.find(pr2);
+        auto itr4 = flows_eth.find(pr2);
 
-        if (itr4 != conversations_eth.end()) {
-            if(shost.compare(dhost)<0){
-                conversations_eth[pr2]["Packets A -> B"]++;
-                conversations_eth[pr2]["Bytes A -> B"] += header->caplen;
-            }else{
+        if (itr4 != flows_eth.end()) {
+            itr4->second.Packets++;
+            itr4->second.Bytes += header->caplen;
 
-                conversations_eth[pr2]["Packets B -> A"]++;
-                conversations_eth[pr2]["Bytes B -> A"] += header->caplen;
-            }
         }else{
 
-            std::map<std::string, unsigned int> mp;
-            if(shost.compare(dhost)<0){
-                mp.insert({"Packets A -> B",1});
-                mp.insert({"Bytes A -> B",header->caplen});
-                mp.insert({"Packets B -> A",0});
-                mp.insert({"Bytes B -> A",0});
-            }else{
-                mp.insert({"Packets A -> B",0});
-                mp.insert({"Bytes A -> B",0});
-                mp.insert({"Packets B -> A",1});
-                mp.insert({"Bytes B -> A",header->caplen});
-            }
-            conversations_eth.insert({pr2,mp});
+            Flow_Value fv = {1, header->caplen};
+            flows_eth.insert({pr2,fv});
         }
 
 
@@ -222,69 +190,43 @@ void callback(u_char *user ,const struct pcap_pkthdr* header, const u_char* pkt_
             std::pair<uint32_t, uint16_t> pr = std::make_pair(ipv4_hdr->ip_src.s_addr,sport);
             auto itr = endpoints_tcp.find(pr);
             if (itr != endpoints_tcp.end()) {
-                endpoints_tcp[pr]["Tx Packets"]++;
-                endpoints_tcp[pr]["Tx Bytes"] += header->caplen;
+                itr->second.Tx_Packets++;
+                itr->second.Tx_Bytes += header->caplen;
 
             } else {
 
-                std::map<std::string, unsigned int> mp;
-                mp.insert({"Tx Packets",1});
-                mp.insert({"Tx Bytes",header->caplen});
-                mp.insert({"Rx Packets",0});
-                mp.insert({"Rx Bytes",0});
-                endpoints_tcp.insert({pr,mp});
+                EP_Value ev = {1, header->caplen, 0, 0};
+                endpoints_tcp.insert({pr,ev});
             }
 
             pr = std::make_pair(ipv4_hdr->ip_dst.s_addr,dport);
             itr = endpoints_tcp.find(pr);
             if (itr != endpoints_tcp.end()) {
-                endpoints_tcp[pr]["Rx Packets"]++;
-                endpoints_tcp[pr]["Rx Bytes"] += header->caplen;
+                itr->second.Rx_Packets++;
+                itr->second.Rx_Bytes += header->caplen;
 
             } else {
 
-                std::map<std::string, unsigned int> mp;
-                mp.insert({"Rx Packets",1});
-                mp.insert({"Rx Bytes",header->caplen});
-                mp.insert({"Tx Packets",0});
-                mp.insert({"Tx Bytes",0});
-                endpoints_tcp.insert({pr,mp});
+                EP_Value ev = { 0, 0 , 1, header->caplen};
+                endpoints_tcp.insert({pr,ev});
             }
 
 
-            //Conversations TCP
-            std::tuple<uint32_t, uint16_t, uint32_t, uint16_t> tp =
-                    (ipv4_hdr->ip_src.s_addr < ipv4_hdr->ip_dst.s_addr)
-                    ? std::make_tuple(ipv4_hdr->ip_src.s_addr, sport, ipv4_hdr->ip_dst.s_addr, dport)
-                    : std::make_tuple(ipv4_hdr->ip_dst.s_addr, dport, ipv4_hdr->ip_src.s_addr, sport);
+            //Flows TCP
+            std::tuple<uint32_t, uint16_t, uint32_t, uint16_t> tp
+                    = std::make_tuple(ipv4_hdr->ip_src.s_addr, sport, ipv4_hdr->ip_dst.s_addr, dport);
 
 
-            auto itr3 = conversations_tcp.find(tp);
+            auto itr3 = flows_tcp.find(tp);
 
-            if (itr3 != conversations_tcp.end()) {
-                if(ipv4_hdr->ip_src.s_addr < ipv4_hdr->ip_dst.s_addr){
-                    conversations_tcp[tp]["Packets A -> B"]++;
-                    conversations_tcp[tp]["Bytes A -> B"] += header->caplen;
-                }else{
+            if (itr3 != flows_tcp.end()) {
+                itr3->second.Packets++;
+                itr3->second.Bytes+= header->caplen;
 
-                    conversations_tcp[tp]["Packets B -> A"]++;
-                    conversations_tcp[tp]["Bytes B -> A"] += header->caplen;
-                }
             }else{
 
-                std::map<std::string, unsigned int> mp;
-                if(ipv4_hdr->ip_src.s_addr < ipv4_hdr->ip_dst.s_addr){
-                    mp.insert({"Packets A -> B",1});
-                    mp.insert({"Bytes A -> B",header->caplen});
-                    mp.insert({"Packets B -> A",0});
-                    mp.insert({"Bytes B -> A",0});
-                }else{
-                    mp.insert({"Packets A -> B",0});
-                    mp.insert({"Bytes A -> B",0});
-                    mp.insert({"Packets B -> A",1});
-                    mp.insert({"Bytes B -> A",header->caplen});
-                }
-                conversations_tcp.insert({tp,mp});
+                Flow_Value fv = {1, header->caplen};
+                flows_tcp.insert({tp,fv});
             }
 
 
@@ -302,70 +244,44 @@ void callback(u_char *user ,const struct pcap_pkthdr* header, const u_char* pkt_
             std::pair<uint32_t, uint16_t> pr = std::make_pair(ipv4_hdr->ip_src.s_addr,sport);
             auto itr = endpoints_udp.find(pr);
             if (itr != endpoints_udp.end()) {
-                endpoints_udp[pr]["Tx Packets"]++;
-                endpoints_udp[pr]["Tx Bytes"] += header->caplen;
+                itr->second.Tx_Packets++;
+                itr->second.Tx_Bytes += header->caplen;
 
             } else {
 
-                std::map<std::string, unsigned int> mp;
-                mp.insert({"Tx Packets",1});
-                mp.insert({"Tx Bytes",header->caplen});
-                mp.insert({"Rx Packets",0});
-                mp.insert({"Rx Bytes",0});
-                endpoints_udp.insert({pr,mp});
+                EP_Value ev = {1, header->caplen, 0, 0};
+                endpoints_udp.insert({pr,ev});
             }
 
             pr = std::make_pair(ipv4_hdr->ip_dst.s_addr,dport);
             itr = endpoints_udp.find(pr);
             if (itr != endpoints_udp.end()) {
-                endpoints_udp[pr]["Rx Packets"]++;
-                endpoints_udp[pr]["Rx Bytes"] += header->caplen;
+                itr->second.Rx_Packets++;
+                itr->second.Rx_Bytes += header->caplen;
 
             } else {
 
-                std::map<std::string, unsigned int> mp;
-                mp.insert({"Rx Packets",1});
-                mp.insert({"Rx Bytes",header->caplen});
-                mp.insert({"Tx Packets",0});
-                mp.insert({"Tx Bytes",0});
-                endpoints_udp.insert({pr,mp});
+                EP_Value ev = { 0, 0 , 1, header->caplen};
+                endpoints_udp.insert({pr,ev});
             }
 
 
-            //Conversations UDP
-            std::tuple<uint32_t, uint16_t, uint32_t, uint16_t> tp =
-                    (ipv4_hdr->ip_src.s_addr < ipv4_hdr->ip_dst.s_addr)
-                    ? std::make_tuple(ipv4_hdr->ip_src.s_addr, sport, ipv4_hdr->ip_dst.s_addr, dport)
-                    : std::make_tuple(ipv4_hdr->ip_dst.s_addr, dport, ipv4_hdr->ip_src.s_addr, sport);
+            //Flows UDP
+            std::tuple<uint32_t, uint16_t, uint32_t, uint16_t> tp
+                    = std::make_tuple(ipv4_hdr->ip_src.s_addr, sport, ipv4_hdr->ip_dst.s_addr, dport);
 
 
+            auto itr3 = flows_udp.find(tp);
 
-            auto itr3 = conversations_udp.find(tp);
+            if (itr3 != flows_udp.end()) {
+                itr3->second.Packets++;
+                itr3->second.Bytes+= header->caplen;
 
-            if (itr3 != conversations_udp.end()) {
-                if(ipv4_hdr->ip_src.s_addr < ipv4_hdr->ip_dst.s_addr){
-                    conversations_udp[tp]["Packets A -> B"]++;
-                    conversations_udp[tp]["Bytes A -> B"] += header->caplen;
-                }else{
-
-                    conversations_udp[tp]["Packets B -> A"]++;
-                    conversations_udp[tp]["Bytes B -> A"] += header->caplen;
-                }
             }else{
 
-                std::map<std::string, unsigned int> mp;
-                if(ipv4_hdr->ip_src.s_addr < ipv4_hdr->ip_dst.s_addr){
-                    mp.insert({"Packets A -> B",1});
-                    mp.insert({"Bytes A -> B",header->caplen});
-                    mp.insert({"Packets B -> A",0});
-                    mp.insert({"Bytes B -> A",0});
-                }else{
-                    mp.insert({"Packets A -> B",0});
-                    mp.insert({"Bytes A -> B",0});
-                    mp.insert({"Packets B -> A",1});
-                    mp.insert({"Bytes B -> A",header->caplen});
-                }
-                conversations_udp.insert({tp,mp});
+                Flow_Value fv = {1, header->caplen};
+                flows_udp.insert({tp,fv});
+
             }
 
         }
@@ -411,14 +327,17 @@ int main(int argc, char* argv[]) {
 
 
 
-    in_addr st;
+
     printf("Endpoints-IPv4\n\n");
     for(auto i : endpoints_ipv4){
-        st.s_addr = i.first;
-        printf("Address :\t%s\n", inet_ntoa(st) );
-        for(auto j : i.second){
-            printf("%s :\t%u\n", j.first.c_str(), j.second);
-        }
+
+        printf("Address :\t%s\n", inet_ntoa(*(struct in_addr*)&i.first) );
+
+        printf("Tx_Packets :\t%u\n", i.second.Tx_Packets);
+        printf("Tx_Bytes :\t%u\n", i.second.Tx_Bytes);
+        printf("Rx_Packets :\t%u\n", i.second.Rx_Packets);
+        printf("Rx_Bytes :\t%u\n", i.second.Rx_Bytes);
+
         printf("\n");
     }
     printf("=======================================================================\n\n");
@@ -427,10 +346,11 @@ int main(int argc, char* argv[]) {
     char buf[20];
     printf("Endpoints-Ethernet\n\n");
     for(auto i : endpoints_eth){
-        printf("Address :\t%s\n", ntoh_hex((uint8_t*)i.first.c_str(),buf,6) );
-        for(auto j : i.second){
-            printf("%s :\t%u\n", j.first.c_str(), j.second);
-        }
+        printf("Address :\t%s\n", ntoh_hex((uint8_t*)i.first,buf,6) );
+        printf("Tx_Packets :\t%u\n", i.second.Tx_Packets);
+        printf("Tx_Bytes :\t%u\n", i.second.Tx_Bytes);
+        printf("Rx_Packets :\t%u\n", i.second.Rx_Packets);
+        printf("Rx_Bytes :\t%u\n", i.second.Rx_Bytes);
         printf("\n");
     }
 
@@ -439,34 +359,40 @@ int main(int argc, char* argv[]) {
 
     printf("Endpoints-tcp\n\n");
     for(auto i : endpoints_tcp){
-        st.s_addr = i.first.first;
-        printf("Address :\t%s\tPort :\t%u\n", inet_ntoa(st), i.first.second );
-        for(auto j : i.second){
-            printf("%s :\t%u\n", j.first.c_str(), j.second);
-        }
+        printf("Address :\t%s\tPort :\t%u\n", inet_ntoa(*(struct in_addr*)&i.first.first), i.first.second );
+        printf("Tx_Packets :\t%u\n", i.second.Tx_Packets);
+        printf("Tx_Bytes :\t%u\n", i.second.Tx_Bytes);
+        printf("Rx_Packets :\t%u\n", i.second.Rx_Packets);
+        printf("Rx_Bytes :\t%u\n", i.second.Rx_Bytes);
         printf("\n");
     }
     printf("=======================================================================\n\n");
 
     printf("Endpoints-udp\n\n");
     for(auto i : endpoints_udp){
-        st.s_addr = i.first.first;
-        printf("Address :\t%s\tPort :\t%u\n", inet_ntoa(st), i.first.second );
-        for(auto j : i.second){
-            printf("%s :\t%u\n", j.first.c_str(), j.second);
-        }
+        printf("Address :\t%s\tPort :\t%u\n", inet_ntoa(*(struct in_addr*)&i.first.first), i.first.second );
+        printf("Tx_Packets :\t%u\n", i.second.Tx_Packets);
+        printf("Tx_Bytes :\t%u\n", i.second.Tx_Bytes);
+        printf("Rx_Packets :\t%u\n", i.second.Rx_Packets);
+        printf("Rx_Bytes :\t%u\n", i.second.Rx_Bytes);
         printf("\n");
     }
     printf("=======================================================================\n\n");
 
     printf("Conversations-IPv4\n\n");
-    for(auto i : conversations_ipv4){
-        st.s_addr = i.first.first;
-        printf("Address A :\t%s\t", inet_ntoa(st) );
-        st.s_addr = i.first.second;
-        printf("Address B :\t%s\n", inet_ntoa(st) );
-        for(auto j : i.second){
-            printf("%s :\t%u\n", j.first.c_str(), j.second);
+    for(auto i : flows_ipv4){
+        printf("Address A :\t%s\t", inet_ntoa(*(struct in_addr*)&i.first.first));
+        printf("Address B :\t%s\n", inet_ntoa(*(struct in_addr*)&i.first.second));
+        printf("Packets A->B :\t%u\n", i.second.Packets);
+        printf("Bytes A->B :\t%u\n", i.second.Bytes);
+
+        auto itr = flows_ipv4.find(reverse_pair(i.first));
+        if(itr != flows_ipv4.end()){
+            printf("Packets B->A :\t%u\n", itr->second.Packets);
+            printf("Bytes B->A :\t%u\n", itr->second.Bytes);
+        }else{
+            printf("Packets B->A :\t%u\n", 0);
+            printf("Bytes B->A :\t%u\n", 0);
         }
         printf("\n");
     }
@@ -474,24 +400,40 @@ int main(int argc, char* argv[]) {
 
 
     printf("Conversations-Ethernet\n\n");
-    for(auto i : conversations_eth){
-        printf("Address A :\t%s\nAddress B :\t%s\n"
-               , ntoh_hex((uint8_t*)i.first.first.c_str(),buf,6), ntoh_hex((uint8_t*)i.first.second.c_str(),buf,6) );
-        for(auto j : i.second){
-            printf("%s :\t%u\n", j.first.c_str(), j.second);
+    for(auto i : flows_eth){
+        printf("Address A :\t%s\n", ntoh_hex((uint8_t*)i.first.first,buf,6));
+        printf("Address B :\t%s\n", ntoh_hex((uint8_t*)i.first.second,buf,6));
+
+        printf("Packets A->B :\t%u\n", i.second.Packets);
+        printf("Bytes A->B :\t%u\n", i.second.Bytes);
+
+        auto itr = flows_eth.find(reverse_pair(i.first));
+        if(itr != flows_eth.end()){
+            printf("Packets B->A :\t%u\n", itr->second.Packets);
+            printf("Bytes B->A :\t%u\n", itr->second.Bytes);
+        }else{
+            printf("Packets B->A :\t%u\n", 0);
+            printf("Bytes B->A :\t%u\n", 0);
         }
         printf("\n");
     }
     printf("=======================================================================\n\n");
 
     printf("Conversations-tcp\n\n");
-    for(auto i : conversations_tcp){
-        st.s_addr = std::get<0>(i.first);
-        printf("Address :\t%s\tPort :\t%u\n", inet_ntoa(st), std::get<1>(i.first) );
-        st.s_addr = std::get<2>(i.first);
-        printf("Address :\t%s\tPort :\t%u\n", inet_ntoa(st), std::get<3>(i.first) );
-        for(auto j : i.second){
-            printf("%s :\t%u\n", j.first.c_str(), j.second);
+    for(auto i : flows_tcp){
+        printf("Address :\t%s\tPort :\t%u\n", inet_ntoa(*(struct in_addr*)&std::get<0>(i.first)), std::get<1>(i.first) );
+        printf("Address :\t%s\tPort :\t%u\n", inet_ntoa(*(struct in_addr*)&std::get<2>(i.first)), std::get<3>(i.first) );
+
+        printf("Packets A->B :\t%u\n", i.second.Packets);
+        printf("Bytes A->B :\t%u\n", i.second.Bytes);
+
+        auto itr = flows_tcp.find(reverse_tp(i.first));
+        if(itr != flows_tcp.end()){
+            printf("Packets B->A :\t%u\n", itr->second.Packets);
+            printf("Bytes B->A :\t%u\n", itr->second.Bytes);
+        }else{
+            printf("Packets B->A :\t%u\n", 0);
+            printf("Bytes B->A :\t%u\n", 0);
         }
         printf("\n");
     }
@@ -499,18 +441,28 @@ int main(int argc, char* argv[]) {
 
 
     printf("Conversations-udp\n\n");
-    for(auto i : conversations_udp){
-        st.s_addr = std::get<0>(i.first);
-        printf("Address :\t%s\tPort :\t%u\n", inet_ntoa(st), std::get<1>(i.first) );
-        st.s_addr = std::get<2>(i.first);
-        printf("Address :\t%s\tPort :\t%u\n", inet_ntoa(st), std::get<3>(i.first) );
-        for(auto j : i.second){
-            printf("%s :\t%u\n", j.first.c_str(), j.second);
+    for(auto i : flows_udp){
+
+        printf("Address :\t%s\tPort :\t%u\n", inet_ntoa(*(struct in_addr*)&std::get<0>(i.first)), std::get<1>(i.first) );
+        printf("Address :\t%s\tPort :\t%u\n", inet_ntoa(*(struct in_addr*)&std::get<2>(i.first)), std::get<3>(i.first) );
+
+        printf("Packets A->B :\t%u\n", i.second.Packets);
+        printf("Bytes A->B :\t%u\n", i.second.Bytes);
+
+        auto itr = flows_udp.find(reverse_tp(i.first));
+        if(itr != flows_udp.end()){
+            printf("Packets B->A :\t%u\n", itr->second.Packets);
+            printf("Bytes B->A :\t%u\n", itr->second.Bytes);
+        }else{
+            printf("Packets B->A :\t%u\n", 0);
+            printf("Bytes B->A :\t%u\n", 0);
+
         }
         printf("\n");
     }
     printf("=======================================================================\n\n");
 
     return 0;
+
 
 }
