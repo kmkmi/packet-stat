@@ -45,8 +45,8 @@ Flows_udp flows_udp;
 
 
 void usage() {
-    printf("syntax: pcap-test <filename>\n");
-    printf("sample: pcap-test test.pcap\n");
+    printf("syntax: pcap-stat <filename>\n");
+    printf("sample: pcap-stat test.pcap\n");
 }
 
 char* ntoh_hex(u_int8_t *addr, char* buf, int size)
