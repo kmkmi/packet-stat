@@ -346,7 +346,7 @@ int main(int argc, char* argv[]) {
     char buf[20];
     printf("Endpoints-Ethernet\n\n");
     for(auto i : endpoints_eth){
-        printf("Address :\t%s\n", ntoh_hex((uint8_t*)i.first,buf,6) );
+        printf("Address :\t%s\n", hex((uint8_t*)i.first,buf,6) );
         printf("Tx_Packets :\t%u\n", i.second.Tx_Packets);
         printf("Tx_Bytes :\t%u\n", i.second.Tx_Bytes);
         printf("Rx_Packets :\t%u\n", i.second.Rx_Packets);
@@ -401,8 +401,8 @@ int main(int argc, char* argv[]) {
 
     printf("Conversations-Ethernet\n\n");
     for(auto i : flows_eth){
-        printf("Address A :\t%s\n", ntoh_hex((uint8_t*)i.first.first,buf,6));
-        printf("Address B :\t%s\n", ntoh_hex((uint8_t*)i.first.second,buf,6));
+        printf("Address A :\t%s\n", hex((uint8_t*)i.first.first,buf,6));
+        printf("Address B :\t%s\n", hex((uint8_t*)i.first.second,buf,6));
 
         printf("Packets A->B :\t%u\n", i.second.Packets);
         printf("Bytes A->B :\t%u\n", i.second.Bytes);
